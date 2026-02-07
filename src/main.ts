@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import net from 'node:net';
+import { execFile } from 'node:child_process';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -40,15 +41,46 @@ const createWindow = () => {
     mainWindow.close();
   });
 
+  ipcMain.on('inject', (event) => {
+    let injectorPath: string;
+    let dllPath: string;
+
+    if (app.isPackaged) {
+      injectorPath = path.join(process.resourcesPath, 'injector.exe');
+      dllPath = path.join(process.resourcesPath, 'backend.dll');
+    } else {
+       injectorPath = path.join(__dirname, '../../src/native/injector.exe');
+       dllPath = path.join(__dirname, '../../src/native/backend.dll');
+    }
+
+    const targetProcess = 'RobloxPlayerBeta.exe'; // Target process
+    console.log(`Injecting ${dllPath} into ${targetProcess} using ${injectorPath}`);
+    
+    event.sender.send('log-message', `Attempting to inject...`, 'info');
+
+    execFile(injectorPath, [targetProcess, dllPath], (error, stdout, stderr) => {
+      if (error) {
+        console.error('Injection failed:', error);
+        event.sender.send('log-message', `Injection Failed: ${error.message} (Is Roblox open?)`, 'error');
+        return;
+      }
+      
+      console.log('Injector Output:', stdout);
+      event.sender.send('log-message', `Injector: ${stdout}`, 'success');
+    });
+  });
+
   ipcMain.on('send-script', (event, script) => {
     const client = net.createConnection(PIPE_NAME, () => {
       console.log('Connected to pipe!');
       client.write(script);
       client.end();
+      event.sender.send('log-message', 'Script sent successfully.', 'success');
     });
 
     client.on('error', (err) => {
       console.error('Pipe connection error:', err.message);
+      event.sender.send('log-message', `Connection Error: ${err.message} (Is DLL injected?)`, 'error');
     });
   });
 

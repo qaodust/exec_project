@@ -22,6 +22,12 @@ jobs:
     - name: Install Dependencies
       run: npm install
 
+    - name: Compile Native Binaries
+      shell: bash
+      run: |
+        g++ src/native/backend.cpp -shared -o src/native/backend.dll -static
+        g++ src/native/injector.cpp -o src/native/injector.exe -static
+
     - name: Build Executable
       run: npm run make
 

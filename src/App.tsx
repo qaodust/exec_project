@@ -8,6 +8,8 @@ declare global {
       maximize: () => void;
       close: () => void;
       sendScript: (script: string) => void;
+      inject: () => void;
+      onLog: (callback: (text: string, type: string) => void) => void;
     };
   }
 }
@@ -115,13 +117,29 @@ const App = () => {
     setLogs(prev => [...prev, { text, type }]);
   };
 
+  useEffect(() => {
+    if (window.windowControls.onLog) {
+      window.windowControls.onLog((text, type) => {
+        addLog(text, type);
+      });
+    }
+  }, []);
+
   const handleExecute = (scriptToRun: string = script) => {
     addLog(`Attempting to execute script...`);
     if (window.windowControls && window.windowControls.sendScript) {
       window.windowControls.sendScript(scriptToRun);
-      addLog(`Script sent to pipe.`, 'info');
     } else {
       addLog(`Error: Window controls not available.`, 'error');
+    }
+  };
+
+  const handleInject = () => {
+    addLog("Initiating injection...");
+    if (window.windowControls && window.windowControls.inject) {
+      window.windowControls.inject();
+    } else {
+      addLog("Error: Inject function missing.", "error");
     }
   };
 
@@ -178,6 +196,7 @@ const App = () => {
                 </div>
                 <div className="bottom-bar">
                   <button className="btn btn-primary" onClick={() => handleExecute()}>Execute</button>
+                  <button className="btn" onClick={handleInject}>Inject</button>
                   <button className="btn" onClick={handleClear}>Clear</button>
                   <button className="btn">Open File</button>
                   <button className="btn">Save File</button>
