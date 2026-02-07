@@ -96,7 +96,13 @@ const ScriptHub = ({ onExecute }: { onExecute: (script: string) => void }) => {
               <button 
                 className="btn btn-primary" 
                 style={{ marginTop: 'auto', width: '100%' }}
-                onClick={() => onExecute(s.script)}
+                onClick={() => {
+                   if (s.script) {
+                     onExecute(s.script);
+                   } else {
+                     alert("Script content is missing/empty for this item.");
+                   }
+                }}
               >
                 Execute
               </button>
@@ -113,7 +119,7 @@ const App = () => {
   const [script, setScript] = useState('-- Paste your script here\nprint("Hello from exec_project!")');
   const [logs, setLogs] = useState<{ text: string; type: string }[]>([]);
 
-  const addLog = (text: string, type: string = 'info') => {
+  const addLog = (text: string, type = 'info') => {
     setLogs(prev => [...prev, { text, type }]);
   };
 
@@ -125,10 +131,13 @@ const App = () => {
     }
   }, []);
 
-  const handleExecute = (scriptToRun: string = script) => {
-    addLog(`Attempting to execute script...`);
+  const handleExecute = (scriptToRun: string, source = 'Unknown') => {
+    const validScript = scriptToRun || script; // Fallback to editor script if empty (though ScriptHub logic prevents this now)
+    
+    addLog(`[${source}] Executing script... (${validScript.length} chars)`);
+    
     if (window.windowControls && window.windowControls.sendScript) {
-      window.windowControls.sendScript(scriptToRun);
+      window.windowControls.sendScript(validScript);
     } else {
       addLog(`Error: Window controls not available.`, 'error');
     }
@@ -195,7 +204,7 @@ const App = () => {
                   />
                 </div>
                 <div className="bottom-bar">
-                  <button className="btn btn-primary" onClick={() => handleExecute()}>Execute</button>
+                  <button className="btn btn-primary" onClick={() => handleExecute(script, 'Editor')}>Execute</button>
                   <button className="btn" onClick={handleInject}>Inject</button>
                   <button className="btn" onClick={handleClear}>Clear</button>
                   <button className="btn">Open File</button>
@@ -204,7 +213,7 @@ const App = () => {
               </>
             )}
             {activeTab === 'hub' && (
-              <ScriptHub onExecute={handleExecute} />
+              <ScriptHub onExecute={(s) => handleExecute(s, 'Script Hub')} />
             )}
             {activeTab === 'settings' && (
               <div style={{ padding: '20px' }}>
