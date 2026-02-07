@@ -4,7 +4,7 @@
 #include <vector>
 
 // Define the Pipe Name
-#define PIPE_NAME "\.\pipe\exec_project_pipe"
+#define PIPE_NAME "\\\\.\\pipe\\exec_project_pipe"
 
 void ConsoleSetup() {
     AllocConsole();

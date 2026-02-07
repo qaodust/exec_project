@@ -2,8 +2,16 @@
 #include <tlhelp32.h>
 #include <iostream>
 #include <string>
+#include <vector>
 
-// Helper to find Process ID by name
+// List of known Roblox process names
+const std::vector<std::wstring> ROBLOX_PROCESSES = {
+    L"RobloxPlayerBeta.exe",
+    L"Windows10Universal.exe",
+    L"RobloxPlayer.exe"
+};
+
+// Helper to find Process ID by name (exact match)
 DWORD GetProcessIdByName(const std::wstring& processName) {
     DWORD pid = 0;
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -23,6 +31,31 @@ DWORD GetProcessIdByName(const std::wstring& processName) {
     return pid;
 }
 
+// Helper to find any active Roblox process from the known list
+DWORD FindAnyRobloxProcess(std::wstring& foundName) {
+    DWORD pid = 0;
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snapshot != INVALID_HANDLE_VALUE) {
+        PROCESSENTRY32W entry;
+        entry.dwSize = sizeof(entry);
+        if (Process32FirstW(snapshot, &entry)) {
+            do {
+                std::wstring currentName(entry.szExeFile);
+                for (const auto& target : ROBLOX_PROCESSES) {
+                    if (currentName == target) {
+                        pid = entry.th32ProcessID;
+                        foundName = currentName;
+                        break;
+                    }
+                }
+                if (pid != 0) break;
+            } while (Process32NextW(snapshot, &entry));
+        }
+        CloseHandle(snapshot);
+    }
+    return pid;
+}
+
 int main(int argc, char* argv[]) {
     if (argc < 3) {
         std::cerr << "Usage: injector.exe <ProcessName> <DllPath>" << std::endl;
@@ -30,20 +63,32 @@ int main(int argc, char* argv[]) {
     }
 
     // Convert arguments
-    std::string processNameStr = argv[1];
-    std::wstring processName(processNameStr.begin(), processNameStr.end());
     std::string dllPath = argv[2];
+    std::wstring processName;
 
-    std::cout << "Target Process: " << processNameStr << std::endl;
-    std::cout << "DLL Path: " << dllPath << std::endl;
+    std::cout << "Searching for Roblox process..." << std::endl;
 
-    DWORD pid = GetProcessIdByName(processName);
+    // 1. Try to find any known Roblox process automatically
+    DWORD pid = FindAnyRobloxProcess(processName);
+
+    // 2. If not found, try the argument provided (as fallback)
     if (pid == 0) {
-        std::cerr << "Error: Process not found." << std::endl;
+        std::string argNameStr = argv[1];
+        std::wstring argName(argNameStr.begin(), argNameStr.end());
+        std::cout << "Auto-detection failed. Trying argument: " << argNameStr << std::endl;
+        pid = GetProcessIdByName(argName);
+        if (pid != 0) {
+            processName = argName;
+        }
+    }
+
+    if (pid == 0) {
+        std::cerr << "Error: No Roblox process found." << std::endl;
         return 1;
     }
 
-    std::cout << "Found Process ID: " << pid << std::endl;
+    std::wcout << L"Target Process: " << processName << L" (PID: " << pid << L")" << std::endl;
+    std::cout << "DLL Path: " << dllPath << std::endl;
 
     HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
     if (!hProcess) {
@@ -83,7 +128,7 @@ int main(int argc, char* argv[]) {
     
     std::cout << "Injection Successful!" << std::endl;
 
-    // Cleanup handles (Memory remains allocated until process exit, or we could free it after LoadLibrary returns)
+    // Cleanup handles
     CloseHandle(hThread);
     CloseHandle(hProcess);
 
